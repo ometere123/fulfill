@@ -9,7 +9,7 @@ import {
   Copy, FileCheck2, Menu, RefreshCw, Scale, ShieldCheck, Wallet, X
 } from "lucide-react";
 import {
-  ASSESSMENT_GRACE, CHAIN_ID, CHAIN_NAME, EXPLORER_URL, RPC_URL,
+  CHAIN_ID, CHAIN_NAME, EXPLORER_URL, RPC_URL,
   canAssess, canContest, canFinalize, canRequestAssessment, canRecoverUnresolved, canResolveContest, canFinalizeStalledContest, formatGen,
   MAX_ASSESSMENT_ATTEMPTS, MAX_CONTEST_ATTEMPTS,
   localContestBond, parseGen, secondsFromDate, shortAddress, statusLabel,
