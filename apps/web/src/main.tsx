@@ -5,7 +5,7 @@ import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
 import {
-  ArrowRight, CheckCircle2, ChevronRight, CircleDollarSign, ClipboardCheck,
+  ArrowRight, CheckCircle2, ChevronRight, ClipboardCheck,
   Copy, FileCheck2, Menu, RefreshCw, Scale, ShieldCheck, Wallet, X
 } from "lucide-react";
 import {
@@ -418,7 +418,7 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
   const canChooseContest = canContest(record, wallet);
 
   const toggle = (checkId: string) => {
-    setSelected((current) => current.includes(checkId) ? current.filter((id) => id !== checkId) : [...current, checkId]);
+    setSelected((current) => current.includes(checkId) ? current.filter((item) => item !== checkId) : [...current, checkId]);
   };
 
   return <section className="page">
