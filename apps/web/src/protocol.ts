@@ -2,26 +2,32 @@ export const CHAIN_ID = 61999;
 export const CHAIN_NAME = "GenLayer Studionet";
 export const RPC_URL = "https://studio.genlayer.com/api";
 export const EXPLORER_URL = "https://explorer-studio.genlayer.com";
-export const CHALLENGE_BOND_BPS = 500n;
+export const CONTEST_BOND_BPS = 500n;
+export const ASSESSMENT_GRACE = 604800;
 
 export const STATUS = [
-  "ACTIVE",
-  "REVIEW_OPEN",
-  "RETRYABLE",
-  "PROVISIONAL",
-  "CHALLENGED",
-  "SETTLED_PAID",
-  "SETTLED_RETURNED",
-  "EXPIRED_RETURNED",
-  "INCONCLUSIVE_RETURNED",
+  "LOCKED",
+  "ASSESSMENT_REQUESTED",
+  "ASSESSED",
+  "CONTESTED",
+  "FINALIZED",
+  "RECOVERED",
 ] as const;
 
-export const terminalStatuses = new Set([
-  "SETTLED_PAID",
-  "SETTLED_RETURNED",
-  "EXPIRED_RETURNED",
-  "INCONCLUSIVE_RETURNED",
-]);
+export const terminalStatuses = new Set(["FINALIZED", "RECOVERED"]);
+
+export type CheckRule = {
+  id: string;
+  requirement: string;
+  weight_bps: number;
+  source_ids: string[];
+  min_available: number;
+};
+
+export type CheckResult = {
+  check_id: string;
+  result: "SATISFIED" | "NOT_SATISFIED" | "UNRESOLVED" | "SOURCE_UNAVAILABLE" | "MODEL_OUTPUT_INVALID";
+};
 
 export function parseGen(value: string): bigint {
   const text = value.trim();
@@ -37,8 +43,9 @@ export function formatGen(value: bigint | number | string): string {
   return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 
-export function challengeBond(escrow: bigint | number | string): bigint {
-  return BigInt(escrow) * CHALLENGE_BOND_BPS / 10000n;
+export function localContestBond(escrow: bigint | number | string, disputedWeightBps: number): bigint {
+  const disputedValue = BigInt(escrow) * BigInt(disputedWeightBps) / 10000n;
+  return disputedValue * CONTEST_BOND_BPS / 10000n;
 }
 
 export function secondsFromDate(value: string): bigint {
@@ -61,26 +68,38 @@ export function shortAddress(value = ""): string {
   return value ? `${value.slice(0, 6)}…${value.slice(-4)}` : "—";
 }
 
-export function canOpenReview(record: any, wallet: string, now = Math.floor(Date.now() / 1000)): boolean {
-  return statusLabel(record?.status) === "ACTIVE"
-    && wallet.toLowerCase() === String(record?.beneficiary || "").toLowerCase()
-    && now >= Number(record?.review_after || 0)
-    && now <= Number(record?.claim_deadline || 0);
+export function canRequestAssessment(record: any, wallet: string, now = Math.floor(Date.now() / 1000)): boolean {
+  return statusLabel(record?.status) === "LOCKED"
+    && wallet.toLowerCase() === String(record?.recipient || "").toLowerCase()
+    && now >= Number(record?.assessment_after || 0)
+    && now <= Number(record?.request_deadline || 0);
 }
 
-export function canEvaluate(record: any, now = Math.floor(Date.now() / 1000)): boolean {
-  const status = statusLabel(record?.status);
-  return (status === "REVIEW_OPEN" || status === "RETRYABLE")
-    && now <= Number(record?.opened_at || 0) + 604800;
+export function canAssess(record: any, now = Math.floor(Date.now() / 1000)): boolean {
+  return statusLabel(record?.status) === "ASSESSMENT_REQUESTED"
+    && now <= Number(record?.requested_at || 0) + ASSESSMENT_GRACE;
 }
 
-export function canChallenge(record: any, wallet: string, now = Math.floor(Date.now() / 1000)): boolean {
-  const party = [record?.promisor, record?.beneficiary].map((v) => String(v || "").toLowerCase());
-  return statusLabel(record?.status) === "PROVISIONAL"
+export function canContest(record: any, wallet: string, now = Math.floor(Date.now() / 1000)): boolean {
+  const party = [record?.funder, record?.recipient].map((value) => String(value || "").toLowerCase());
+  return statusLabel(record?.status) === "ASSESSED"
     && party.includes(wallet.toLowerCase())
-    && now < Number(record?.challenge_deadline || 0);
+    && now < Number(record?.contest_deadline || 0);
 }
 
 export function canFinalize(record: any, now = Math.floor(Date.now() / 1000)): boolean {
-  return statusLabel(record?.status) === "PROVISIONAL" && now >= Number(record?.challenge_deadline || 0);
+  return statusLabel(record?.status) === "ASSESSED" && now >= Number(record?.contest_deadline || 0);
+}
+
+export function scoreResults(checks: CheckRule[], results: CheckResult[]) {
+  const byId = new Map(checks.map((check) => [check.id, check]));
+  let satisfiedBps = 0;
+  let unresolved = 0;
+  for (const result of results) {
+    const check = byId.get(result.check_id);
+    if (!check) continue;
+    if (result.result === "SATISFIED") satisfiedBps += check.weight_bps;
+    else if (result.result !== "NOT_SATISFIED") unresolved += 1;
+  }
+  return { satisfiedBps, unresolved };
 }
