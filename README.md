@@ -74,8 +74,10 @@ LIVE_EVIDENCE.md            factual live evidence only
 
 ```bash
 python -m py_compile contracts/fulfill.py
-genvm-linter contracts/fulfill.py
-pytest -q
+genvm-lint check contracts/fulfill.py --json
+genvm-lint validate contracts/fulfill.py
+genvm-lint typecheck contracts/fulfill.py
+pytest tests/direct -v
 npm install --prefix apps/web
 npm run lint --prefix apps/web
 npm run typecheck --prefix apps/web

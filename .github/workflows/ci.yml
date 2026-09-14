@@ -1,0 +1,36 @@
+name: verify
+on: [push, pull_request]
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r requirements.txt
+      - run: mkdir -p ~/.cache/gltest-direct && curl -fsSL https://github.com/genlayerlabs/genvm/releases/download/v0.3.0-rc7/genvm-runners-all.tar.xz -o ~/.cache/gltest-direct/genvm-universal-v0.3.0-rc7.tar.xz
+      - run: python -m py_compile contracts/fulfill.py
+      - run: genvm-lint check contracts/fulfill.py --json
+      - run: genvm-lint validate contracts/fulfill.py
+      - run: genvm-lint schema contracts/fulfill.py --output /tmp/fulfill.schema.json
+      - run: PYTHONIOENCODING=utf-8 genvm-lint typecheck contracts/fulfill.py
+      - run: pytest tests/direct -v
+  web:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          ! git ls-files | grep -E '(^|/)(\.env|node_modules|\.venv|__pycache__)(/|$)|(^|/)(C:/Users/|AppData/|file:///C:)'
+          ! git grep -n -E 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|mnemonic|seed phrase' -- ':!.github/workflows/ci.yml'
