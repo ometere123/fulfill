@@ -62,6 +62,29 @@ def test_creation_persists_roles_scorecard_and_accounting(direct_vm, direct_depl
 
 
 @pytest.mark.direct
+def test_creation_normalizes_raw_hex_recipient_string(direct_vm, direct_deploy, direct_alice):
+    contract = deploy(direct_deploy)
+    raw_recipient = "0x81301DD9C3605a7DA743D87b803156d8445620B0"
+    funder = addr(contract, direct_alice)
+    direct_vm.sender, direct_vm.value = funder, 1000
+
+    contract.create_commitment(
+        raw_recipient,
+        "Raw recipient boundary",
+        "Persist an externally supplied recipient safely",
+        FUTURE_START,
+        FUTURE_END,
+        FUTURE_ASSESS,
+        FUTURE_DEADLINE,
+        1000,
+        SOURCES,
+        CHECKS,
+    )
+
+    assert contract.get_commitment(1).recipient == addr(contract, raw_recipient)
+
+
+@pytest.mark.direct
 def test_creation_requires_exact_funding(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_deploy)
     direct_vm.sender, direct_vm.value = addr(contract, direct_alice), 999

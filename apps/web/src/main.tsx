@@ -117,11 +117,22 @@ async function write(functionName: string, args: any[] = [], value = 0n) {
   if (!writeClient) throw new Error("Connect your wallet first.");
   if (!contractAddress) throw new Error("VITE_FULFILL_CONTRACT_ADDRESS is not configured.");
   const hash = await writeClient.writeContract({ address: contractAddress, functionName, args, value });
-  const receipt = await writeClient.waitForTransactionReceipt({
-    hash,
-    status: TransactionStatus.FINALIZED,
-    fullTransaction: true,
-  });
+  let receipt;
+  try {
+    receipt = await writeClient.waitForTransactionReceipt({
+      hash,
+      status: TransactionStatus.FINALIZED,
+      interval: 5000,
+      retries: 360,
+      fullTransaction: true,
+    });
+  } catch (reason: any) {
+    const message = String(reason?.message || reason);
+    if (/tim(e|ed out)|timeout|retries/i.test(message)) {
+      throw new Error(`Transaction was submitted but is still waiting for finalization. Check its live status in Explorer: ${EXPLORER_URL}/tx/${hash}`);
+    }
+    throw reason;
+  }
   const consensus = String(receipt.resultName || "");
   if (["MAJORITY_DISAGREE", "NO_MAJORITY", "DISAGREE"].includes(consensus)) {
     throw new Error("Validator consensus was not reached. No successful state change is being reported.");

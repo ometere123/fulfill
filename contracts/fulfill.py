@@ -385,7 +385,7 @@ class Fulfill(gl.Contract):
     @gl.public.write.payable
     def create_commitment(
         self,
-        recipient: Address,
+        recipient: str,
         title: str,
         obligation: str,
         performance_start: u256,
@@ -397,8 +397,10 @@ class Fulfill(gl.Contract):
         checks_json: str,
     ):
         now = self._now()
-        assert recipient != self._zero(), "recipient is required"
-        assert recipient != gl.message.sender_address, "funder cannot be recipient"
+        funder_address = Address(str(gl.message.sender_address))
+        recipient_address = Address(str(recipient))
+        assert recipient_address != self._zero(), "recipient is required"
+        assert recipient_address != funder_address, "funder cannot be recipient"
         assert gl.message.value == escrow_amount and escrow_amount > 0, "exact escrow funding is required"
         assert 0 < len(title.strip()) <= 140, "invalid title"
         assert 0 < len(obligation.strip()) <= 2400, "invalid obligation"
@@ -408,8 +410,8 @@ class Fulfill(gl.Contract):
         commitment_id = self.next_id
         self.next_id += 1
         self.commitments[commitment_id] = Commitment(
-            gl.message.sender_address,
-            recipient,
+            funder_address,
+            recipient_address,
             title,
             obligation,
             source_catalog_json,
@@ -500,7 +502,7 @@ class Fulfill(gl.Contract):
         assert gl.message.value == bond, "exact contest bond is required"
 
         commitment.status = u8(CONTESTED)
-        commitment.contester = gl.message.sender_address
+        commitment.contester = Address(str(gl.message.sender_address))
         commitment.contest_scope = check_ids_json
         commitment.contest_bond = bond
         commitment.contest_opened_at = self._now()
@@ -647,20 +649,22 @@ class Fulfill(gl.Contract):
         return items
 
     @gl.public.view
-    def list_commitments_by_funder(self, funder: Address, start: u256, limit: u8) -> list:
+    def list_commitments_by_funder(self, funder: str, start: u256, limit: u8) -> list:
         assert 0 < limit <= u8(MAX_PAGE_SIZE), "invalid page size"
+        funder_address = Address(str(funder))
         items = []
         for commitment_id in range(start, min(self.next_id, start + u256(limit))):
-            if commitment_id in self.commitments and self.commitments[commitment_id].funder == funder:
+            if commitment_id in self.commitments and self.commitments[commitment_id].funder == funder_address:
                 items.append(self.commitments[commitment_id])
         return items
 
     @gl.public.view
-    def list_commitments_by_recipient(self, recipient: Address, start: u256, limit: u8) -> list:
+    def list_commitments_by_recipient(self, recipient: str, start: u256, limit: u8) -> list:
         assert 0 < limit <= u8(MAX_PAGE_SIZE), "invalid page size"
+        recipient_address = Address(str(recipient))
         items = []
         for commitment_id in range(start, min(self.next_id, start + u256(limit))):
-            if commitment_id in self.commitments and self.commitments[commitment_id].recipient == recipient:
+            if commitment_id in self.commitments and self.commitments[commitment_id].recipient == recipient_address:
                 items.append(self.commitments[commitment_id])
         return items
 
