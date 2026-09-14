@@ -49,6 +49,30 @@ function useRoute() {
 function useWallet() {
   const [wallet, setWallet] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const provider = window.ethereum;
+    if (!provider) return;
+
+    const syncAccount = (accounts: string[]) => {
+      const account = accounts[0] || "";
+      if (!account) writeClient = null;
+      setWallet(account);
+    };
+    const syncChain = (chainId: string) => {
+      setError(Number(chainId) === CHAIN_ID ? "" : `Switch your wallet to ${CHAIN_NAME} (chain ${CHAIN_ID}).`);
+    };
+
+    provider.request({ method: "eth_accounts" }).then(syncAccount).catch(() => undefined);
+    provider.request({ method: "eth_chainId" }).then(syncChain).catch(() => undefined);
+    provider.on?.("accountsChanged", syncAccount);
+    provider.on?.("chainChanged", syncChain);
+    return () => {
+      provider.removeListener?.("accountsChanged", syncAccount);
+      provider.removeListener?.("chainChanged", syncChain);
+    };
+  }, []);
+
   const connect = async () => {
     setError("");
     if (!window.ethereum) return setError("Connect an injected wallet to continue.");
@@ -74,7 +98,6 @@ function useWallet() {
       }
       const account = accounts[0];
       writeClient = createClient({ chain: studionet, provider: window.ethereum, account });
-      await writeClient.connect("studionet");
       setWallet(account);
     } catch (reason: any) {
       setError(reason?.message || "Wallet connection failed.");
