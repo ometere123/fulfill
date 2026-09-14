@@ -165,4 +165,9 @@ GitHub Actions runs the same verification on every push and pull request.
 
 ## Deployment status
 
-The repository does not invent deployment evidence. Until `LIVE_EVIDENCE.md` contains real finalised transaction hashes, a real contract address and successful post-deployment reads, treat Fulfill as **built and verified but not yet deployed**.
+Fulfill is deployed on **GenLayer Studionet (chain 61999)**. The canonical contract is
+`0x0c850e64E5B6699735c9628507f8f82cDDb108e3`, deployed in transaction
+`0xe29e56802d4582eb71e10f01c165908f525988265b66aedda88e5e5d62bc24b9`.
+
+The production frontend is available at https://web-three-pi-nr0xb6dnug.vercel.app. See
+[`LIVE_EVIDENCE.md`](LIVE_EVIDENCE.md) for the observed deployment result and post-deployment reads.
