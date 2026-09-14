@@ -20,7 +20,7 @@ def create(vm, contract, promisor, beneficiary, escrow=1000):
     promisor, beneficiary = addr(contract, promisor), addr(contract, beneficiary)
     vm.warp("1970-01-01T00:00:01Z")
     vm.sender, vm.value = promisor, escrow
-    contract.create_commitment(beneficiary, "Uptime", "Service remains available", 0, 100, 100, 200, escrow, SOURCE, OUTCOMES)
+    contract.create_commitment(beneficiary, "Uptime", "Service remains available", 2, 100, 100, 200, escrow, SOURCE, OUTCOMES)
 
 
 @pytest.mark.direct
@@ -42,17 +42,28 @@ def test_creation_persists_parties_and_accounting(direct_vm, direct_deploy, dire
 @pytest.mark.direct
 def test_creation_requires_exact_funding(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_deploy)
+    direct_vm.warp("1970-01-01T00:00:01Z")
     direct_vm.sender, direct_vm.value = addr(contract, direct_alice), 999
     with pytest.raises(AssertionError):
-        contract.create_commitment(addr(contract, direct_bob), "x", "y", 0, 100, 100, 200, 1000, SOURCE, OUTCOMES)
+        contract.create_commitment(addr(contract, direct_bob), "x", "y", 2, 100, 100, 200, 1000, SOURCE, OUTCOMES)
 
 
 @pytest.mark.direct
 def test_promisor_cannot_be_beneficiary(direct_vm, direct_deploy, direct_alice):
     contract = deploy(direct_deploy)
+    direct_vm.warp("1970-01-01T00:00:01Z")
     direct_vm.sender, direct_vm.value = addr(contract, direct_alice), 1000
     with pytest.raises(AssertionError):
-        contract.create_commitment(addr(contract, direct_alice), "x", "y", 0, 100, 100, 200, 1000, SOURCE, OUTCOMES)
+        contract.create_commitment(addr(contract, direct_alice), "x", "y", 2, 100, 100, 200, 1000, SOURCE, OUTCOMES)
+
+
+@pytest.mark.direct
+def test_known_past_performance_cannot_be_backfilled(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract = deploy(direct_deploy)
+    direct_vm.warp("1970-01-01T00:03:20Z")
+    direct_vm.sender, direct_vm.value = addr(contract, direct_alice), 1000
+    with pytest.raises(AssertionError):
+        contract.create_commitment(addr(contract, direct_bob), "Past event", "Already known", 100, 150, 150, 300, 1000, SOURCE, OUTCOMES)
 
 
 @pytest.mark.direct
