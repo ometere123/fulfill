@@ -171,3 +171,137 @@ Fulfill is deployed on **GenLayer Studionet (chain 61999)**. The canonical contr
 
 The production frontend is available at https://web-three-pi-nr0xb6dnug.vercel.app. See
 [`LIVE_EVIDENCE.md`](LIVE_EVIDENCE.md) for the observed deployment result and post-deployment reads.
+
+## What Fulfill is
+
+Fulfill is a weighted performance escrow for agreements where success is made up of several independently measurable facts. A funder locks GEN before performance begins, defines the recipient and freezes a scorecard, and the recipient earns the portion represented by the checks that are satisfied.
+
+Fulfill is deliberately not a single-verdict guarantee. Each check has its own requirement, weight, authorised evidence sources, and minimum source-availability rule. Scorecard weights must total exactly `10,000` basis points.
+
+## User journey
+
+### For a funder
+
+1. Connect an injected wallet on Studionet.
+2. Define the recipient, title, obligation, timeline, evidence catalogue, and weighted checks.
+3. Review the scorecard total and fund the exact escrow amount.
+4. Monitor the commitment and its assessment state from the registry or detail page.
+5. Contest only the check IDs in dispute during the contest window, with a bond proportional to their economic value.
+6. Receive the remaining escrow when deterministic settlement or a recovery path completes.
+
+### For a recipient
+
+1. Review the frozen obligation, scorecard, and evidence scope.
+2. Perform the obligation during the agreed performance window.
+3. Request assessment after the assessment opening time.
+4. Inspect each independent result and the provisional fulfilment percentage.
+5. Contest selected checks when necessary, or receive the deterministic payout after finalisation.
+
+## Scorecard model
+
+| Field | Purpose |
+| --- | --- |
+| Check ID | Stable identifier for one performance fact |
+| Requirement | Natural-language condition validators evaluate |
+| Weight | Economic importance in basis points |
+| Source IDs | Frozen evidence sources authorised for this check |
+| Minimum availability | Number of scoped sources that must be available |
+
+The contract freezes both the evidence catalogue and every check's source scope at creation. A source authorised for one check does not automatically authorise another check.
+
+## Assessment and settlement
+
+GenLayer validators interpret the frozen public evidence for each check independently. The semantic outcomes are `SATISFIED`, `NOT_SATISFIED`, and `UNRESOLVED`; unavailable evidence and invalid model output remain explicit technical states.
+
+The intelligent-contract layer does not choose money. Settlement is deterministic:
+
+```text
+satisfied weight = sum of SATISFIED check weights
+recipient payout = escrow × satisfied weight / 10,000
+funder return    = remaining escrow
+```
+
+Assessments are bounded and respect the configured grace period and retry interval. If an assessment cannot reach a usable result, the contract exposes explicit unresolved recovery paths rather than silently converting uncertainty into a payout.
+
+## Check-level contests
+
+Either party may contest selected check IDs during the contest window. Only those checks are reassessed; untouched results remain unchanged.
+
+```text
+disputed value = escrow × disputed weight / 10,000
+contest bond   = disputed value × contest_bond_bps / 10,000
+```
+
+The frontend shows the selected scope, disputed weight, disputed value, and authoritative bond quote before submission. Contest attempts are bounded, and stalled contests have an explicit finalisation path.
+
+## Contract interface
+
+The deployed contract exposes reads for constants, commitments, checks, sources, assessment records, accounting, and contest-bond quotes. State-changing methods include `create_commitment`, `request_assessment`, `assess_commitment`, `contest_checks`, `resolve_contest`, `finalize_assessment`, `recover_unresolved`, `recover_unclaimed`, and `finalize_stalled_contest`.
+
+There is no privileged admin settlement override. Role checks, timing, scope validation, arithmetic, accounting, and transfers remain deterministic contract logic.
+
+## Wallet and network
+
+The web app uses the injected EIP-1193 provider at `window.ethereum` for connection, account changes, chain changes, network switching, and transaction signing. It does not use MetaMask Snaps, WalletConnect, an embedded wallet, or a separate transaction provider.
+
+| Setting | Value |
+| --- | --- |
+| Network | GenLayer Studionet |
+| Chain ID | `61999` |
+| RPC | `https://studio.genlayer.com/api` |
+| Explorer | `https://explorer-studio.genlayer.com` |
+| Contract | `0x0c850e64E5B6699735c9628507f8f82cDDb108e3` |
+
+## Local development
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+For local reads and writes, set the real address in an ignored `.env.local`:
+
+```text
+VITE_FULFILL_CONTRACT_ADDRESS=0x0c850e64E5B6699735c9628507f8f82cDDb108e3
+```
+
+Never commit environment files, keystores, private keys, or seed phrases. The stable Fulfill GenLayer CLI is kept separately from any global release-candidate CLI and must always use the explicit Studionet RPC.
+
+## Verification
+
+Contract verification:
+
+```bash
+python -m py_compile contracts/fulfill.py
+genvm-lint check contracts/fulfill.py --json
+genvm-lint validate contracts/fulfill.py
+genvm-lint schema contracts/fulfill.py --output /tmp/fulfill.schema.json
+PYTHONIOENCODING=utf-8 genvm-lint typecheck contracts/fulfill.py
+pytest tests/direct -v
+```
+
+Frontend verification:
+
+```bash
+cd apps/web
+npm install
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+GitHub Actions runs the contract, web, and hygiene jobs on pushes and pull requests. Live deployment reads and factual deployment records are maintained in [`LIVE_EVIDENCE.md`](LIVE_EVIDENCE.md).
+
+## Repository map
+
+| Path | Purpose |
+| --- | --- |
+| `contracts/fulfill.py` | Intelligent contract and deterministic settlement |
+| `apps/web/src/main.tsx` | React application and wallet-integrated flows |
+| `apps/web/src/protocol.ts` | Lifecycle, validation, scoring, and payout helpers |
+| `apps/web/src/style.css` | Fulfill visual identity and responsive layout |
+| `tests/direct/` | GenVM Direct Mode contract tests |
+| `docs/` | Architecture, security, threat, testing, and deployment documentation |
+| `LIVE_EVIDENCE.md` | Observed deployment evidence only |
