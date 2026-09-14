@@ -4,6 +4,11 @@ export const RPC_URL = "https://studio.genlayer.com/api";
 export const EXPLORER_URL = "https://explorer-studio.genlayer.com";
 export const CONTEST_BOND_BPS = 500n;
 export const ASSESSMENT_GRACE = 604800;
+export const MIN_RETRY_INTERVAL = 3600;
+export const MAX_ASSESSMENT_ATTEMPTS = 8;
+export const MAX_CONTEST_ATTEMPTS = 8;
+export const MAX_SOURCES = 8;
+export const MAX_CHECKS = 8;
 
 export const STATUS = [
   "LOCKED",
@@ -77,7 +82,9 @@ export function canRequestAssessment(record: any, wallet: string, now = Math.flo
 
 export function canAssess(record: any, now = Math.floor(Date.now() / 1000)): boolean {
   return statusLabel(record?.status) === "ASSESSMENT_REQUESTED"
-    && now <= Number(record?.requested_at || 0) + ASSESSMENT_GRACE;
+    && now <= Number(record?.requested_at || 0) + ASSESSMENT_GRACE
+    && Number(record?.assessment_attempts || 0) < MAX_ASSESSMENT_ATTEMPTS
+    && (Number(record?.assessment_attempts || 0) === 0 || now >= Number(record?.last_assessment_attempt_at || 0) + MIN_RETRY_INTERVAL);
 }
 
 export function canContest(record: any, wallet: string, now = Math.floor(Date.now() / 1000)): boolean {
@@ -85,6 +92,39 @@ export function canContest(record: any, wallet: string, now = Math.floor(Date.no
   return statusLabel(record?.status) === "ASSESSED"
     && party.includes(wallet.toLowerCase())
     && now < Number(record?.contest_deadline || 0);
+}
+
+export function canRecoverUnresolved(record: any, now = Math.floor(Date.now() / 1000)): boolean {
+  if (statusLabel(record?.status) !== "ASSESSMENT_REQUESTED") return false;
+  const exhausted = Number(record?.assessment_attempts || 0) >= MAX_ASSESSMENT_ATTEMPTS;
+  const elapsed = now > Number(record?.requested_at || 0) + ASSESSMENT_GRACE;
+  return (exhausted || elapsed) && (Number(record?.assessment_attempts || 0) === 0 || now >= Number(record?.last_assessment_attempt_at || 0) + MIN_RETRY_INTERVAL);
+}
+
+export function canResolveContest(record: any, now = Math.floor(Date.now() / 1000)): boolean {
+  return statusLabel(record?.status) === "CONTESTED"
+    && now <= Number(record?.contest_opened_at || 0) + ASSESSMENT_GRACE
+    && Number(record?.contest_attempts || 0) < MAX_CONTEST_ATTEMPTS
+    && (Number(record?.contest_attempts || 0) === 0 || now >= Number(record?.last_contest_attempt_at || 0) + MIN_RETRY_INTERVAL);
+}
+
+export function canFinalizeStalledContest(record: any, now = Math.floor(Date.now() / 1000)): boolean {
+  if (statusLabel(record?.status) !== "CONTESTED") return false;
+  const exhausted = Number(record?.contest_attempts || 0) >= MAX_CONTEST_ATTEMPTS;
+  const elapsed = now > Number(record?.contest_opened_at || 0) + ASSESSMENT_GRACE;
+  return (exhausted || elapsed) && (Number(record?.contest_attempts || 0) === 0 || now >= Number(record?.last_contest_attempt_at || 0) + MIN_RETRY_INTERVAL);
+}
+
+export function validateTimeline(start: bigint, end: bigint, assessmentAfter: bigint, deadline: bigint, now = BigInt(Math.floor(Date.now() / 1000))) {
+  if (start <= now) throw new Error("Performance must start in the future.");
+  if (end <= start) throw new Error("Performance end must be after its start.");
+  if (assessmentAfter < end) throw new Error("Assessment must open on or after performance ends.");
+  if (deadline <= assessmentAfter) throw new Error("Request deadline must be after assessment opens.");
+}
+
+export function validateWeights(checks: Pick<CheckRule, "weight_bps">[]) {
+  const total = checks.reduce((sum, check) => sum + Number(check.weight_bps), 0);
+  if (total !== 10000) throw new Error(`Check weights must total exactly 10,000 bps. Current total: ${total}.`);
 }
 
 export function canFinalize(record: any, now = Math.floor(Date.now() / 1000)): boolean {

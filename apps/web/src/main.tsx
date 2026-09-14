@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import {
   ASSESSMENT_GRACE, CHAIN_ID, CHAIN_NAME, EXPLORER_URL, RPC_URL,
-  canAssess, canContest, canFinalize, canRequestAssessment, formatGen,
+  canAssess, canContest, canFinalize, canRequestAssessment, canRecoverUnresolved, canResolveContest, canFinalizeStalledContest, formatGen,
+  MAX_ASSESSMENT_ATTEMPTS, MAX_CONTEST_ATTEMPTS,
   localContestBond, parseGen, secondsFromDate, shortAddress, statusLabel,
   terminalStatuses, toDateInput, type CheckResult, type CheckRule,
 } from "./protocol";
@@ -476,11 +477,11 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
         <span className="panel-label">Available actions</span>
         <Action enabled={canRequestAssessment(record,wallet)} label="Request assessment" help="Recipient opens scoring after the performance window." onClick={() => action("request","request_assessment")}/>
         <Action enabled={canAssess(record)} label="Assess scorecard" help="Permissionless. Validators evaluate each check only against its scoped sources." onClick={() => action("assess","assess_commitment")}/>
-        <Action enabled={statusLabel(record.status)==="CONTESTED"} label="Resolve contest" help="Re-assesses only the selected disputed checks." onClick={() => action("resolve","resolve_contest")}/>
+        <Action enabled={canResolveContest(record)} label="Resolve contest" help={record.contest_attempts >= MAX_CONTEST_ATTEMPTS ? "Contest attempts exhausted." : "Re-assesses only the selected disputed checks."} onClick={() => action("resolve","resolve_contest")}/>
         <Action enabled={canFinalize(record)} label="Finalize score" help="After the contest window, deterministic code pays the satisfied share." onClick={() => action("finalize","finalize_assessment")}/>
         <Action enabled={statusLabel(record.status)==="LOCKED" && Date.now()/1000>Number(record.request_deadline)} label="Recover unclaimed" help="Returns escrow if the recipient never requests assessment in time." onClick={() => action("recover","recover_unclaimed")}/>
-        <Action enabled={statusLabel(record.status)==="ASSESSMENT_REQUESTED" && Date.now()/1000>Number(record.requested_at)+ASSESSMENT_GRACE} label="Recover unresolved" help="Liveness escape if evidence never becomes conclusive." onClick={() => action("unresolved","recover_unresolved")}/>
-        <Action enabled={statusLabel(record.status)==="CONTESTED" && Date.now()/1000>Number(record.contest_opened_at)+ASSESSMENT_GRACE} label="Close stalled contest" help="Falls back to the original score and returns the contest bond." onClick={() => action("stalled","finalize_stalled_contest")}/>
+        <Action enabled={canRecoverUnresolved(record)} label="Recover unresolved" help="Available after the attempt cap or assessment grace, including the retry interval." onClick={() => action("unresolved","recover_unresolved")}/>
+        <Action enabled={canFinalizeStalledContest(record)} label="Close stalled contest" help="Available after the contest attempt cap or grace, including the retry interval." onClick={() => action("stalled","finalize_stalled_contest")}/>
         {busy && <div className="action-note">Transaction pending: {busy}</div>}
         {error && <div className="inline-error">{error}</div>}
       </aside>
@@ -491,8 +492,8 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
       <div><span>Performance</span><b>{toDateInput(record.performance_start)} → {toDateInput(record.performance_end)}</b></div>
       <div><span>Assessment after</span><b>{toDateInput(record.assessment_after)}</b></div>
       <div><span>Request deadline</span><b>{toDateInput(record.request_deadline)}</b></div>
-      <div><span>Assessment attempts</span><b>{String(record.assessment_attempts)} / 8</b></div>
-      <div><span>Contest attempts</span><b>{String(record.contest_attempts)} / 8</b></div>
+        <div><span>Assessment attempts</span><b>{String(record.assessment_attempts)} / {MAX_ASSESSMENT_ATTEMPTS}</b></div>
+        <div><span>Contest attempts</span><b>{String(record.contest_attempts)} / {MAX_CONTEST_ATTEMPTS}</b></div>
     </article>
   </section>;
 }
