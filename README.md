@@ -1,92 +1,168 @@
 # Fulfill
 
-> Performance commitments, enforced by evidence.
+Fulfill is a GenLayer-native **weighted performance escrow**.
 
-Fulfill is a GenLayer-native performance assurance protocol. A promisor names one beneficiary, freezes a measurable obligation and public evidence policy, and pre-funds the maximum liability. If review is opened, GenLayer validators interpret the frozen evidence and return one precommitted outcome code. Deterministic contract logic maps that code to the payout already agreed at creation.
+A funder locks GEN before performance begins and freezes a scorecard describing what successful performance means. Each scorecard check has:
 
-**Validators classify. Deterministic code settles.**
+- a measurable natural-language requirement,
+- a weight in basis points,
+- an explicit set of allowed public evidence-source IDs, and
+- a minimum number of those sources that must be available.
 
-## Why GenLayer
+After performance, the recipient requests assessment. GenLayer validators assess each check independently as `SATISFIED`, `NOT_SATISFIED`, or `UNRESOLVED`. The intelligent-contract layer interprets evidence; it does **not** choose money.
 
-Escrow arithmetic is easy for an ordinary smart contract. The difficult part is deciding whether a natural-language obligation was actually fulfilled when the facts live on public web pages and require interpretation. Fulfill uses validator consensus for that semantic classification while keeping financial authority outside the model.
-
-The model cannot change parties, add a source, rewrite terms, invent an outcome or choose a payout amount.
-
-## Core flow
-
-1. Promisor creates a commitment and sends the exact escrow.
-2. Contract freezes beneficiary, obligation, timeline, source authority and outcome matrix.
-3. After performance ends, the named beneficiary may open review before the claim deadline.
-4. Anyone may trigger evaluation during the bounded review window.
-5. Validators inspect only the frozen HTTPS evidence and classify one allowed outcome.
-6. A decided result becomes provisional for 48 hours.
-7. Either party may challenge with the exact 5% bond.
-8. Deterministic code settles the final outcome or bounded recovery closes unresolved states.
-
-## Outcome model
-
-Each commitment has two to five frozen outcomes. The policy must include both a `0%` payout and a `100%` payout; intermediate outcomes may represent partial breach. Settlement is always:
+The settlement rule is deterministic:
 
 ```text
-beneficiary payout = escrow_total × payout_bps / 10,000
-promisor return = escrow_remaining − beneficiary payout
+recipient payout = escrow × satisfied_weight_bps / 10_000
+funder return    = remaining escrow
 ```
 
-## Evidence authority
+If a party disagrees, it contests specific check IDs rather than reopening the entire commitment. The contest bond is calculated from the value represented by those disputed checks.
 
-One to five HTTPS sources may be frozen. At least one must be a required `PRIMARY` source. `CORROBORATING` evidence can support but cannot silently override clear primary evidence. Required-source failure, conflicting evidence and invalid model output are explicit non-decision states rather than automatic beneficiary denial.
+## Why Fulfill needs GenLayer
 
-Fetched page content is treated as untrusted data. Validators are instructed not to follow evidence links, add authorities or obey instructions embedded in source content.
+Escrow arithmetic is easy for an ordinary smart contract. The difficult part is determining whether a real-world requirement such as delivery timing, service quality, an SLA threshold, or another natural-language performance condition was actually met by the frozen evidence.
 
-## Liveness and challenges
+Fulfill narrows that non-deterministic authority:
 
-Primary review and challenge review each have a maximum of eight attempts, a one-hour retry interval and a seven-day grace window. A provisional result has a 48-hour challenge window. A losing directional challenge forfeits its 5% bond to the counterparty; a successful direction receives the bond back. A stalled challenge falls back to the provisional result and returns the bond.
+1. the evidence catalogue is frozen before performance;
+2. every check declares exactly which source IDs validators may use;
+3. validators return only fact labels for each check;
+4. unresolved or unavailable evidence never silently becomes a financial decision;
+5. deterministic contract code sums satisfied weights and calculates settlement.
 
-Unopened commitments can be reclaimed after the claim deadline. Review that cannot resolve within the bounded policy returns the remaining escrow to the promisor with an explicit inconclusive terminal state.
+## Protocol model
 
-## Frontend
-
-The web app provides:
-
-- public landing page and commitment registry
-- create/fund flow with frozen policy preview
-- commitment detail with parties, timing, sources and outcome matrix
-- wallet-filtered `My rights` and `My issued` views
-- guarded review, evaluation, challenge, finalisation and recovery actions
-- stable Studionet wallet switching for chain `61999`
-- finalised receipt checks before reporting write success
-
-The visual system is original to Fulfill: parchment surfaces, forest green, mint and safety orange, with hard-edged receipt/assurance cards.
-
-## Repository structure
+Lifecycle:
 
 ```text
-contracts/fulfill.py        Intelligent Contract
-apps/web/                   React + Vite frontend
-apps/web/src/protocol.ts    chain constants, units and UI guards
-tests/direct/               contract and policy tests
-docs/                       architecture, security, threat model and deployment handoff
-AGENT_HANDOFF.md            final Codex validation/deployment instructions
-LIVE_EVIDENCE.md            factual live evidence only
+LOCKED
+  -> ASSESSMENT_REQUESTED
+  -> ASSESSED
+      -> FINALIZED
+      -> CONTESTED -> FINALIZED
+
+LOCKED -> RECOVERED                 (no assessment requested in time)
+ASSESSMENT_REQUESTED -> RECOVERED   (bounded unresolved assessment)
 ```
 
-## Local verification
+An assessment that still contains unresolved checks remains `ASSESSMENT_REQUESTED` and may be retried subject to the retry interval and attempt cap.
+
+### Scorecard example
+
+```json
+[
+  {
+    "id": "DELIVERY_TIME",
+    "requirement": "delivery completed before the agreed deadline",
+    "weight_bps": 4000,
+    "source_ids": ["TRACKING"],
+    "min_available": 1
+  },
+  {
+    "id": "QUANTITY",
+    "requirement": "delivered quantity meets the agreed minimum",
+    "weight_bps": 3500,
+    "source_ids": ["TRACKING", "WAREHOUSE_RECORD"],
+    "min_available": 1
+  },
+  {
+    "id": "QUALITY",
+    "requirement": "the inspection threshold is met",
+    "weight_bps": 2500,
+    "source_ids": ["INSPECTION"],
+    "min_available": 1
+  }
+]
+```
+
+All check weights must total exactly `10_000` basis points.
+
+## Check-level contesting
+
+After a complete assessment, either party may select one or more check IDs to contest during the contest window.
+
+```text
+disputed value = escrow × disputed_weight_bps / 10_000
+contest bond   = disputed value × 5%
+```
+
+Only the selected checks are reassessed. Their replacement results are merged into the original scorecard before deterministic settlement.
+
+## Liveness and safety
+
+Fulfill includes:
+
+- exact escrow funding;
+- funder/recipient separation;
+- no post-creation mutation of the scorecard or evidence catalogue;
+- no backfilling commitments after performance has started;
+- bounded assessment and contest attempts;
+- minimum retry intervals;
+- explicit unavailable/invalid/unresolved states;
+- scoped contests;
+- proportional contest bonds;
+- bounded registry reads;
+- separate escrow and bond accounting;
+- state/accounting updates before external transfers;
+- recovery paths when assessment cannot complete.
+
+See `docs/SECURITY_MODEL.md` and `docs/THREAT_MODEL.md` for the full trust model.
+
+## Network
+
+Fulfill targets **GenLayer Studionet**:
+
+```text
+chain id: 61999
+rpc: https://studio.genlayer.com/api
+explorer: https://explorer-studio.genlayer.com
+```
+
+Do not substitute Studionet-dev / chain `61997`.
+
+## Repository
+
+```text
+contracts/fulfill.py           intelligent contract
+apps/web/                      React + Vite frontend
+tests/direct/                  GenVM Direct Mode tests
+docs/ARCHITECTURE.md           protocol architecture
+docs/SECURITY_MODEL.md         security and trust boundaries
+docs/THREAT_MODEL.md           adversarial analysis
+docs/TESTING.md                verification procedure
+docs/DEPLOYMENT.md             61999 deployment handoff
+LIVE_EVIDENCE.md               deployment evidence only when real
+AGENT_HANDOFF.md               final Codex deployment handoff
+```
+
+## Verification
+
+Contract checks:
 
 ```bash
 python -m py_compile contracts/fulfill.py
 genvm-lint check contracts/fulfill.py --json
 genvm-lint validate contracts/fulfill.py
-genvm-lint typecheck contracts/fulfill.py
+genvm-lint schema contracts/fulfill.py --output /tmp/fulfill.schema.json
+PYTHONIOENCODING=utf-8 genvm-lint typecheck contracts/fulfill.py
 pytest tests/direct -v
-npm install --prefix apps/web
-npm run lint --prefix apps/web
-npm run typecheck --prefix apps/web
-npm test --prefix apps/web
-npm run build --prefix apps/web
 ```
 
-See `docs/TESTING.md` for verification scope and `docs/DEPLOYMENT.md` for the live Studionet handoff.
+Frontend checks:
 
-## Current status
+```bash
+cd apps/web
+npm install
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-The implementation and deployment handoff are in-repo. No contract address or transaction hash is claimed until the deployment agent completes real Studionet verification and records it in `LIVE_EVIDENCE.md`.
+GitHub Actions runs the same verification on every push and pull request.
+
+## Deployment status
+
+The repository does not invent deployment evidence. Until `LIVE_EVIDENCE.md` contains real finalised transaction hashes, a real contract address and successful post-deployment reads, treat Fulfill as **built and verified but not yet deployed**.
