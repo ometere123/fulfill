@@ -1,0 +1,30 @@
+/* Layout corrections for the scorecard and the default desktop presentation. */
+.proof-step {
+  grid-template-columns: 72px minmax(0, 1fr) 24px;
+}
+
+.proof-step span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+footer {
+  width: min(1180px, calc(100% - 36px));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 901px) {
+  .app-shell {
+    zoom: .8;
+    width: 125%;
+  }
+}
+
+@media (max-width: 900px) {
+  footer {
+    width: calc(100% - 20px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

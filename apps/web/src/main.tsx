@@ -1,4 +1,5 @@
 import "./style.css";
+import "./layout-fixes.css";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "genlayer-js";
