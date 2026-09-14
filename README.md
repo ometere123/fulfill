@@ -266,7 +266,7 @@ For local reads and writes, set the real address in an ignored `.env.local`:
 VITE_FULFILL_CONTRACT_ADDRESS=0x0c850e64E5B6699735c9628507f8f82cDDb108e3
 ```
 
-Never commit environment files, keystores, private keys, or seed phrases. The stable Fulfill GenLayer CLI is kept separately from any global release-candidate CLI and must always use the explicit Studionet RPC.
+Never commit environment files, keystores, private keys, or wallet credentials. The stable Fulfill GenLayer CLI is kept separately from any global release-candidate CLI and must always use the explicit Studionet RPC.
 
 ## Verification
 
