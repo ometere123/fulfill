@@ -89,10 +89,16 @@ export function shortAddress(value = ""): string {
 }
 
 export function canRequestAssessment(record: any, wallet: string, now = Math.floor(Date.now() / 1000)): boolean {
-  return statusLabel(record?.status) === "LOCKED"
-    && wallet.toLowerCase() === String(record?.recipient || "").toLowerCase()
-    && now >= Number(record?.assessment_after || 0)
-    && now <= Number(record?.request_deadline || 0);
+  return requestAssessmentState(record, wallet, now) === "AVAILABLE";
+}
+
+export type RequestAssessmentState = "AVAILABLE" | "NOT_ELIGIBLE" | "NOT_OPEN" | "EXPIRED";
+
+export function requestAssessmentState(record: any, wallet: string, now = Math.floor(Date.now() / 1000)): RequestAssessmentState {
+  if (statusLabel(record?.status) !== "LOCKED" || wallet.toLowerCase() !== String(record?.recipient || "").toLowerCase()) return "NOT_ELIGIBLE";
+  if (now < Number(record?.assessment_after || 0)) return "NOT_OPEN";
+  if (now > Number(record?.request_deadline || 0)) return "EXPIRED";
+  return "AVAILABLE";
 }
 
 export function canAssess(record: any, now = Math.floor(Date.now() / 1000)): boolean {

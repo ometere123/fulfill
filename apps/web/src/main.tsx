@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import {
   CHAIN_ID, CHAIN_NAME, EXPLORER_URL, RPC_URL,
-  canAssess, canContest, canFinalize, canRequestAssessment, canRecoverUnresolved, canResolveContest, canFinalizeStalledContest, formatGen,
+  canAssess, canContest, canFinalize, requestAssessmentState, canRecoverUnresolved, canResolveContest, canFinalizeStalledContest, formatGen,
   CLOCK_SKEW_MARGIN, MAX_ASSESSMENT_ATTEMPTS, MAX_CONTEST_ATTEMPTS,
   localContestBond, parseGen, secondsFromDate, shortAddress, statusLabel, validateTimeline,
   terminalStatuses, toDateInput, type CheckResult, type CheckRule,
@@ -425,20 +425,42 @@ function resultMap(record: Commitment): Map<string,string> {
   }
 }
 
+function requestHelp(record: Commitment, wallet: string): string {
+  const state = requestAssessmentState(record, wallet);
+  if (state === "NOT_OPEN") return `Assessment is not open yet. Opens ${toDateInput(record.assessment_after)}.`;
+  if (state === "EXPIRED") return `Request window expired. Deadline was ${toDateInput(record.request_deadline)}.`;
+  if (state === "NOT_ELIGIBLE") return "Only the recorded recipient can request assessment while the commitment is locked.";
+  return "Recipient opens scoring after the performance window, before the request deadline.";
+}
+
 function Detail({ id, wallet }: {id:number; wallet:string}) {
   const [record, setRecord] = useState<Commitment | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
   const load = async () => {
     try { setRecord({ id, ...(await read("get_commitment", [id])) }); setError(""); }
     catch (reason:any) { setError(reason.message); }
   };
   useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const action = async (label:string, functionName:string) => {
-    try { setBusy(label); setError(""); await write(functionName, [id]); await load(); }
+    try {
+      setBusy(label); setError("");
+      const fresh = { id, ...(await read("get_commitment", [id])) } as Commitment;
+      setRecord(fresh);
+      if (functionName === "request_assessment") {
+        const requestState = requestAssessmentState(fresh, wallet, Math.floor(Date.now() / 1000));
+        if (requestState !== "AVAILABLE") throw new Error(requestHelp(fresh, wallet));
+      }
+      await write(functionName, [id]); await load();
+    }
     catch (reason:any) { setError(reason.message); }
     finally { setBusy(""); }
   };
@@ -469,6 +491,7 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
   const disputedWeight = checks.filter((check) => selected.includes(check.id)).reduce((sum, check) => sum + check.weight_bps, 0);
   const estimatedBond = localContestBond(record.escrow_total, disputedWeight);
   const canChooseContest = canContest(record, wallet);
+  const requestState = requestAssessmentState(record, wallet, now);
 
   const toggle = (checkId: string) => {
     setSelected((current) => current.includes(checkId) ? current.filter((item) => item !== checkId) : [...current, checkId]);
@@ -527,7 +550,7 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
 
       <aside className="panel action-panel">
         <span className="panel-label">Available actions</span>
-        <Action enabled={canRequestAssessment(record,wallet)} label="Request assessment" help="Recipient opens scoring after the performance window." onClick={() => action("request","request_assessment")}/>
+        <Action enabled={requestState === "AVAILABLE"} label="Request assessment" help={requestHelp(record, wallet)} onClick={() => action("request","request_assessment")}/>
         <Action enabled={canAssess(record)} label="Assess scorecard" help="Permissionless. Validators evaluate each check only against its scoped sources." onClick={() => action("assess","assess_commitment")}/>
         <Action enabled={canResolveContest(record)} label="Resolve contest" help={record.contest_attempts >= MAX_CONTEST_ATTEMPTS ? "Contest attempts exhausted." : "Re-assesses only the selected disputed checks."} onClick={() => action("resolve","resolve_contest")}/>
         <Action enabled={canFinalize(record)} label="Finalize score" help="After the contest window, deterministic code pays the satisfied share." onClick={() => action("finalize","finalize_assessment")}/>

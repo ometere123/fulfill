@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { CHAIN_ID, CLOCK_SKEW_MARGIN, formatGen, localContestBond, parseGen, scoreResults, statusLabel, canAssess, canRecoverUnresolved, canFinalizeStalledContest, transactionExecutionOutcome, validateTimeline, validateWeights } from "./protocol";
+import { CHAIN_ID, CLOCK_SKEW_MARGIN, formatGen, localContestBond, parseGen, scoreResults, statusLabel, canAssess, canRecoverUnresolved, canFinalizeStalledContest, transactionExecutionOutcome, validateTimeline, validateWeights, canRequestAssessment, requestAssessmentState } from "./protocol";
 
 describe("protocol helpers", () => {
+  const locked = { status: 0, recipient: "0xabc", assessment_after: 200, request_deadline: 300 };
+  it("gates assessment requests before the opening time", () => {
+    expect(requestAssessmentState(locked, "0xabc", 199)).toBe("NOT_OPEN");
+    expect(canRequestAssessment(locked, "0xabc", 199)).toBe(false);
+  });
+  it("expires assessment requests after the deadline", () => {
+    expect(requestAssessmentState(locked, "0xabc", 301)).toBe("EXPIRED");
+    expect(canRequestAssessment(locked, "0xabc", 301)).toBe(false);
+  });
+  it("allows an eligible recipient during the request window", () => {
+    expect(requestAssessmentState(locked, "0xABC", 250)).toBe("AVAILABLE");
+    expect(canRequestAssessment(locked, "0xABC", 250)).toBe(true);
+  });
   it("pins the stable Studionet chain", () => expect(CHAIN_ID).toBe(61999));
 
   it("parses and formats GEN without floating point", () => {
