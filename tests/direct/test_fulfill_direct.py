@@ -197,3 +197,30 @@ def test_constants_expose_scorecard_limits(direct_deploy):
     assert constants["contest_bond_bps"] == 500
     assert constants["max_checks"] == 8
     assert constants["max_page_size"] == 25
+
+
+@pytest.mark.direct
+@pytest.mark.parametrize("results", [
+    [{"check_id": "CHECK_A", "result": "SATISFIED"}, {"check_id": "CHECK_A", "result": "NOT_SATISFIED"}],
+    [{"check_id": "CHECK_A", "result": "SATISFIED"}],
+    [{"check_id": "CHECK_A", "result": "SATISFIED"}, {"check_id": "CHECK_C", "result": "SATISFIED"}],
+    [{"check_id": "CHECK_A", "result": "MAYBE"}, {"check_id": "CHECK_B", "result": "SATISFIED"}],
+    [{"check_id": "CHECK_B", "result": "SATISFIED"}, {"check_id": "CHECK_A", "result": "SATISFIED"}],
+])
+def test_assessment_results_require_exact_ordered_scorecard(direct_vm, direct_deploy, direct_alice, direct_bob, results):
+    contract = deploy(direct_deploy)
+    create(direct_vm, contract, direct_alice, direct_bob)
+    with pytest.raises(AssertionError):
+        contract._score_results(contract.get_commitment(1), json.dumps(results))
+
+
+@pytest.mark.direct
+def test_contest_results_must_match_selected_check_scope(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract = deploy(direct_deploy)
+    create(direct_vm, contract, direct_alice, direct_bob)
+    commitment = contract.get_commitment(1)
+    selected = json.dumps(["CHECK_B"])
+    valid = [{"check_id": "CHECK_B", "result": "UNRESOLVED"}]
+    assert contract._score_results(commitment, json.dumps(valid), selected) == [0, 1]
+    with pytest.raises(AssertionError):
+        contract._score_results(commitment, json.dumps(valid + [{"check_id": "CHECK_A", "result": "SATISFIED"}]), selected)

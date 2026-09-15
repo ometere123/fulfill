@@ -285,8 +285,8 @@ class Fulfill(gl.Contract):
 
         return gl.vm.run_nondet_unsafe(classify, validator)
 
-    def _score_results(self, commitment: Commitment, results_json: str) -> list:
-        results = json.loads(results_json)
+    def _score_results(self, commitment: Commitment, results_json: str, scope_json: str = "") -> list:
+        results = self._validate_results(commitment, results_json, scope_json)
         satisfied_bps = 0
         unresolved_count = 0
         for item in results:
@@ -297,12 +297,27 @@ class Fulfill(gl.Contract):
                 unresolved_count += 1
         return [satisfied_bps, unresolved_count]
 
+    def _validate_results(self, commitment: Commitment, results_json: str, scope_json: str) -> list:
+        results = json.loads(results_json)
+        assert isinstance(results, list), "assessment results must be a list"
+        expected = self._scope_ids(commitment, scope_json)
+        assert len(results) == len(expected), "assessment result count mismatch"
+        seen = []
+        for item in results:
+            assert isinstance(item, dict) and set(item.keys()) == {"check_id", "result"}, "invalid assessment result"
+            check_id = item["check_id"]
+            assert check_id in expected and check_id not in seen, "assessment check scope mismatch"
+            assert item["result"] in (SATISFIED, NOT_SATISFIED, UNRESOLVED), "invalid assessment result label"
+            seen.append(check_id)
+        assert seen == expected, "assessment result order mismatch"
+        return results
+
     def _record_key(self, commitment_id: u256, contest: bool, round_number: u8) -> u256:
         return commitment_id * RECORD_STRIDE + (CONTEST_RECORD_OFFSET if contest else u256(0)) + u256(round_number)
 
     def _record_assessment(self, commitment_id: u256, contest: bool, round_number: u8, scope_json: str, results_json: str):
         commitment = self._get(commitment_id)
-        score = self._score_results(commitment, results_json)
+        score = self._score_results(commitment, results_json, scope_json)
         key = self._record_key(commitment_id, contest, round_number)
         self.assessments[key] = AssessmentRecord(
             commitment_id,
