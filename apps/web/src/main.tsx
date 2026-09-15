@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
-import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
+import { TransactionStatus } from "genlayer-js/types";
 import {
   ArrowRight, CheckCircle2, ChevronRight, ClipboardCheck,
   Copy, FileCheck2, Menu, RefreshCw, Scale, ShieldCheck, Wallet, X
@@ -15,6 +15,7 @@ import {
   MAX_ASSESSMENT_ATTEMPTS, MAX_CONTEST_ATTEMPTS,
   localContestBond, parseGen, secondsFromDate, shortAddress, statusLabel,
   terminalStatuses, toDateInput, type CheckResult, type CheckRule,
+  transactionExecutionOutcome,
 } from "./protocol";
 
 const contractAddress = import.meta.env.VITE_FULFILL_CONTRACT_ADDRESS || "";
@@ -139,13 +140,9 @@ async function write(functionName: string, args: any[] = [], value = 0n) {
   if (["MAJORITY_DISAGREE", "NO_MAJORITY", "DISAGREE"].includes(consensus)) {
     throw new Error("Validator consensus was not reached. No successful state change is being reported.");
   }
-  const executionResult = receipt.txExecutionResultName
-    ?? receipt.executionResultName
-    ?? receipt.execution_result
-    ?? ({ 0: ExecutionResult.NOT_VOTED, 1: ExecutionResult.FINISHED_WITH_RETURN, 2: ExecutionResult.FINISHED_WITH_ERROR } as Record<number, string>)[Number(receipt.txExecutionResult)];
-  if (executionResult !== ExecutionResult.FINISHED_WITH_RETURN) {
-    throw new Error("The transaction did not finish successfully.");
-  }
+  const outcome = transactionExecutionOutcome(receipt);
+  if (outcome === "ERROR") throw new Error(`Contract execution failed. Check the transaction in Explorer: ${EXPLORER_URL}/tx/${hash}`);
+  if (outcome === "UNKNOWN") throw new Error(`Transaction finalized, but the execution result could not be interpreted. Do not resubmit yet. Check its state in Explorer: ${EXPLORER_URL}/tx/${hash}`);
   return receipt;
 }
 

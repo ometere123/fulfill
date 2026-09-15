@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAIN_ID, formatGen, localContestBond, parseGen, scoreResults, statusLabel, canAssess, canRecoverUnresolved, canFinalizeStalledContest, validateWeights } from "./protocol";
+import { CHAIN_ID, formatGen, localContestBond, parseGen, scoreResults, statusLabel, canAssess, canRecoverUnresolved, canFinalizeStalledContest, transactionExecutionOutcome, validateWeights } from "./protocol";
 
 describe("protocol helpers", () => {
   it("pins the stable Studionet chain", () => expect(CHAIN_ID).toBe(61999));
@@ -50,4 +50,11 @@ describe("protocol helpers", () => {
   });
 
   it("rejects malformed GEN amounts", () => expect(() => parseGen("1e9")).toThrow());
+
+  it("interprets typed and Studionet leader receipts", () => {
+    expect(transactionExecutionOutcome({ txExecutionResultName: "FINISHED_WITH_RETURN" })).toBe("SUCCESS");
+    expect(transactionExecutionOutcome({ consensus_data: { leader_receipt: [{ execution_result: "SUCCESS" }] } })).toBe("SUCCESS");
+    expect(transactionExecutionOutcome({ consensus_data: { leader_receipt: [{ execution_result: "ERROR" }] } })).toBe("ERROR");
+    expect(transactionExecutionOutcome({})).toBe("UNKNOWN");
+  });
 });

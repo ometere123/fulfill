@@ -53,6 +53,20 @@ export function localContestBond(escrow: bigint | number | string, disputedWeigh
   return disputedValue * CONTEST_BOND_BPS / 10000n;
 }
 
+export function transactionExecutionOutcome(receipt: any): "SUCCESS" | "ERROR" | "UNKNOWN" {
+  const typedName = String(
+    receipt?.txExecutionResultName ?? receipt?.executionResultName ?? receipt?.execution_result ?? "",
+  ).toUpperCase();
+  const numericResult = receipt?.txExecutionResult === undefined ? undefined : Number(receipt.txExecutionResult);
+  const leaderReceipt = Array.isArray(receipt?.consensus_data?.leader_receipt)
+    ? receipt.consensus_data.leader_receipt[0]
+    : receipt?.consensus_data?.leader_receipt;
+  const studioResult = String(leaderReceipt?.execution_result ?? "").toUpperCase();
+  if (typedName === "FINISHED_WITH_RETURN" || numericResult === 1 || studioResult === "SUCCESS" || studioResult === "FINISHED_WITH_RETURN") return "SUCCESS";
+  if (typedName === "FINISHED_WITH_ERROR" || numericResult === 2 || ["ERROR", "FAILURE", "FAILED", "FINISHED_WITH_ERROR"].includes(studioResult)) return "ERROR";
+  return "UNKNOWN";
+}
+
 export function secondsFromDate(value: string): bigint {
   const time = Date.parse(value);
   if (!Number.isFinite(time)) throw new Error("Choose a valid date and time.");
