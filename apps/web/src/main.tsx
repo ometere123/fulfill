@@ -57,7 +57,9 @@ function useWallet() {
 
     const syncAccount = (accounts: string[]) => {
       const account = accounts[0] || "";
-      if (!account) writeClient = null;
+      writeClient = account
+        ? createClient({ chain: studionet, provider, account: account as `0x${string}` })
+        : null;
       setWallet(account);
     };
     const syncChain = (chainId: string) => {
@@ -139,7 +141,8 @@ async function write(functionName: string, args: any[] = [], value = 0n) {
   }
   const executionResult = receipt.txExecutionResultName
     ?? receipt.executionResultName
-    ?? receipt.execution_result;
+    ?? receipt.execution_result
+    ?? ({ 0: ExecutionResult.NOT_VOTED, 1: ExecutionResult.FINISHED_WITH_RETURN, 2: ExecutionResult.FINISHED_WITH_ERROR } as Record<number, string>)[Number(receipt.txExecutionResult)];
   if (executionResult !== ExecutionResult.FINISHED_WITH_RETURN) {
     throw new Error("The transaction did not finish successfully.");
   }
