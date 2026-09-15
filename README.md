@@ -166,10 +166,10 @@ GitHub Actions runs the same verification on every push and pull request.
 ## Deployment status
 
 Fulfill is deployed on **GenLayer Studionet (chain 61999)**. The canonical contract is
-`0x0c850e64E5B6699735c9628507f8f82cDDb108e3`, deployed in transaction
-`0xe29e56802d4582eb71e10f01c165908f525988265b66aedda88e5e5d62bc24b9`.
+`0x6C20db2862538c5609d598DF31436bB9067488D0`, deployed in transaction
+`0x122b47ffe8507408ccd836157a405426b85c5da4fb06e5d7667ed578bbe42beb`.
 
-The production frontend is available at https://web-three-pi-nr0xb6dnug.vercel.app. See
+The production frontend is available at https://the-fulfill.vercel.app. See
 [`LIVE_EVIDENCE.md`](LIVE_EVIDENCE.md) for the observed deployment result and post-deployment reads.
 
 ## What Fulfill is
@@ -250,7 +250,7 @@ The web app uses the injected EIP-1193 provider at `window.ethereum` for connect
 | Chain ID | `61999` |
 | RPC | `https://studio.genlayer.com/api` |
 | Explorer | `https://explorer-studio.genlayer.com` |
-| Contract | `0x0c850e64E5B6699735c9628507f8f82cDDb108e3` |
+| Contract | `0x6C20db2862538c5609d598DF31436bB9067488D0` |
 
 ## Local development
 
@@ -263,7 +263,7 @@ npm run dev
 For local reads and writes, set the real address in an ignored `.env.local`:
 
 ```text
-VITE_FULFILL_CONTRACT_ADDRESS=0x0c850e64E5B6699735c9628507f8f82cDDb108e3
+VITE_FULFILL_CONTRACT_ADDRESS=0x6C20db2862538c5609d598DF31436bB9067488D0
 ```
 
 Never commit environment files, keystores, private keys, or wallet credentials. The stable Fulfill GenLayer CLI is kept separately from any global release-candidate CLI and must always use the explicit Studionet RPC.
