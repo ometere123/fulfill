@@ -1,1 +1,1 @@
-{"version":2,"buildCommand":"npm run build --prefix apps/web","outputDirectory":"apps/web/dist","installCommand":"npm install --prefix apps/web","rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
+{"version":2,"buildCommand":"npm run build --prefix apps/web","outputDirectory":"apps/web/dist","installCommand":"npm ci --prefix apps/web","rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
