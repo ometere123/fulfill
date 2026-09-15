@@ -309,7 +309,7 @@ class Fulfill(gl.Contract):
             assert check_id in expected and check_id not in seen, "assessment check scope mismatch"
             assert item["result"] in (SATISFIED, NOT_SATISFIED, UNRESOLVED), "invalid assessment result label"
             seen.append(check_id)
-        assert seen == expected, "assessment result order mismatch"
+        assert set(seen) == set(expected), "assessment result scope mismatch"
         return results
 
     def _record_key(self, commitment_id: u256, contest: bool, round_number: u8) -> u256:

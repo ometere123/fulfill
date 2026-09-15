@@ -205,13 +205,23 @@ def test_constants_expose_scorecard_limits(direct_deploy):
     [{"check_id": "CHECK_A", "result": "SATISFIED"}],
     [{"check_id": "CHECK_A", "result": "SATISFIED"}, {"check_id": "CHECK_C", "result": "SATISFIED"}],
     [{"check_id": "CHECK_A", "result": "MAYBE"}, {"check_id": "CHECK_B", "result": "SATISFIED"}],
-    [{"check_id": "CHECK_B", "result": "SATISFIED"}, {"check_id": "CHECK_A", "result": "SATISFIED"}],
 ])
-def test_assessment_results_require_exact_ordered_scorecard(direct_vm, direct_deploy, direct_alice, direct_bob, results):
+def test_assessment_results_reject_malformed_scorecard(direct_vm, direct_deploy, direct_alice, direct_bob, results):
     contract = deploy(direct_deploy)
     create(direct_vm, contract, direct_alice, direct_bob)
     with pytest.raises(AssertionError):
         contract._score_results(contract.get_commitment(1), json.dumps(results))
+
+
+@pytest.mark.direct
+def test_assessment_results_accept_reordered_equivalent_scorecard(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract = deploy(direct_deploy)
+    create(direct_vm, contract, direct_alice, direct_bob)
+    results = [
+        {"check_id": "CHECK_B", "result": "SATISFIED"},
+        {"check_id": "CHECK_A", "result": "NOT_SATISFIED"},
+    ]
+    assert contract._score_results(contract.get_commitment(1), json.dumps(results)) == [4000, 0]
 
 
 @pytest.mark.direct
