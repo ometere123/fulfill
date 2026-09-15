@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAIN_ID, formatGen, localContestBond, parseGen, scoreResults, statusLabel, canAssess, canRecoverUnresolved, canFinalizeStalledContest, transactionExecutionOutcome, validateWeights } from "./protocol";
+import { CHAIN_ID, CLOCK_SKEW_MARGIN, formatGen, localContestBond, parseGen, scoreResults, statusLabel, canAssess, canRecoverUnresolved, canFinalizeStalledContest, transactionExecutionOutcome, validateTimeline, validateWeights } from "./protocol";
 
 describe("protocol helpers", () => {
   it("pins the stable Studionet chain", () => expect(CHAIN_ID).toBe(61999));
@@ -50,6 +50,16 @@ describe("protocol helpers", () => {
   });
 
   it("rejects malformed GEN amounts", () => expect(() => parseGen("1e9")).toThrow());
+
+  it("validates timeline ordering and future margin", () => {
+    const now = 1000n;
+    expect(() => validateTimeline(999n, 1100n, 1200n, 1300n, now)).toThrow(/future/);
+    expect(() => validateTimeline(1100n, 1050n, 1200n, 1300n, now)).toThrow(/end/);
+    expect(() => validateTimeline(1100n, 1200n, 1150n, 1300n, now)).toThrow(/Assessment/);
+    expect(() => validateTimeline(1100n, 1200n, 1300n, 1250n, now)).toThrow(/deadline/);
+    expect(() => validateTimeline(1100n, 1200n, 1300n, 1400n, now)).not.toThrow();
+    expect(() => validateTimeline(1050n, 1200n, 1300n, 1400n, now + BigInt(CLOCK_SKEW_MARGIN))).toThrow(/future/);
+  });
 
   it("interprets typed and Studionet leader receipts", () => {
     expect(transactionExecutionOutcome({ txExecutionResultName: "FINISHED_WITH_RETURN" })).toBe("SUCCESS");

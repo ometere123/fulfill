@@ -9,6 +9,7 @@ export const MAX_ASSESSMENT_ATTEMPTS = 8;
 export const MAX_CONTEST_ATTEMPTS = 8;
 export const MAX_SOURCES = 8;
 export const MAX_CHECKS = 8;
+export const CLOCK_SKEW_MARGIN = 60;
 
 export const STATUS = [
   "LOCKED",
@@ -68,7 +69,7 @@ export function transactionExecutionOutcome(receipt: any): "SUCCESS" | "ERROR" |
 }
 
 export function secondsFromDate(value: string): bigint {
-  const time = Date.parse(value);
+  const time = new Date(value).getTime();
   if (!Number.isFinite(time)) throw new Error("Choose a valid date and time.");
   return BigInt(Math.floor(time / 1000));
 }

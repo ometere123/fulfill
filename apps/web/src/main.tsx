@@ -12,8 +12,8 @@ import {
 import {
   CHAIN_ID, CHAIN_NAME, EXPLORER_URL, RPC_URL,
   canAssess, canContest, canFinalize, canRequestAssessment, canRecoverUnresolved, canResolveContest, canFinalizeStalledContest, formatGen,
-  MAX_ASSESSMENT_ATTEMPTS, MAX_CONTEST_ATTEMPTS,
-  localContestBond, parseGen, secondsFromDate, shortAddress, statusLabel,
+  CLOCK_SKEW_MARGIN, MAX_ASSESSMENT_ATTEMPTS, MAX_CONTEST_ATTEMPTS,
+  localContestBond, parseGen, secondsFromDate, shortAddress, statusLabel, validateTimeline,
   terminalStatuses, toDateInput, type CheckResult, type CheckRule,
   transactionExecutionOutcome,
 } from "./protocol";
@@ -299,10 +299,12 @@ function scopeFrom(value: FormDataEntryValue | null, hasB: boolean): string[] {
 function Issue({ wallet, navigate }: any) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
+    setFieldErrors({});
     if (!wallet) return setMessage("Connect the funding wallet before creating a commitment.");
     const data = new FormData(event.currentTarget);
     try {
@@ -326,15 +328,26 @@ function Issue({ wallet, navigate }: any) {
       const total = checks.reduce((sum, check) => sum + check.weight_bps, 0);
       if (total !== 10000) throw new Error(`Check weights must total exactly 10,000 bps. Current total: ${total}.`);
       if (checks.some((check) => !check.requirement)) throw new Error("All three scorecard checks need a measurable requirement.");
+      const timeline = {
+        start: secondsFromDate(String(data.get("start"))),
+        end: secondsFromDate(String(data.get("end"))),
+        assessmentAfter: secondsFromDate(String(data.get("assessmentAfter"))),
+        deadline: secondsFromDate(String(data.get("deadline"))),
+      };
+      try {
+        validateTimeline(timeline.start, timeline.end, timeline.assessmentAfter, timeline.deadline, BigInt(Math.floor(Date.now() / 1000) + CLOCK_SKEW_MARGIN));
+      } catch (reason: any) {
+        const text = String(reason?.message || reason);
+        const key = text.includes("start") ? "start" : text.includes("end") ? "end" : text.includes("Assessment") ? "assessmentAfter" : "deadline";
+        setFieldErrors({ [key]: text });
+        throw reason;
+      }
 
       await write("create_commitment", [
         String(data.get("recipient")),
         String(data.get("title")),
         String(data.get("obligation")),
-        secondsFromDate(String(data.get("start"))),
-        secondsFromDate(String(data.get("end"))),
-        secondsFromDate(String(data.get("assessmentAfter"))),
-        secondsFromDate(String(data.get("deadline"))),
+        timeline.start, timeline.end, timeline.assessmentAfter, timeline.deadline,
         escrow,
         JSON.stringify(sources),
         JSON.stringify(checks),
@@ -360,11 +373,12 @@ function Issue({ wallet, navigate }: any) {
       </div>
       <div className="form-section"><span>03 · Timeline</span>
         <div className="two">
-          <label>Performance starts<input name="start" required type="datetime-local"/></label>
-          <label>Performance ends<input name="end" required type="datetime-local"/></label>
-          <label>Assessment available after<input name="assessmentAfter" required type="datetime-local"/></label>
-          <label>Request deadline<input name="deadline" required type="datetime-local"/></label>
+          <label>Performance starts<input name="start" required type="datetime-local" aria-invalid={Boolean(fieldErrors.start)} aria-describedby="start-error"/>{fieldErrors.start && <small id="start-error" className="field-error">{fieldErrors.start}</small>}</label>
+          <label>Performance ends<input name="end" required type="datetime-local" aria-invalid={Boolean(fieldErrors.end)} aria-describedby="end-error"/>{fieldErrors.end && <small id="end-error" className="field-error">{fieldErrors.end}</small>}</label>
+          <label>Assessment available after<input name="assessmentAfter" required type="datetime-local" aria-invalid={Boolean(fieldErrors.assessmentAfter)} aria-describedby="assessment-error"/>{fieldErrors.assessmentAfter && <small id="assessment-error" className="field-error">{fieldErrors.assessmentAfter}</small>}</label>
+          <label>Request deadline<input name="deadline" required type="datetime-local" aria-invalid={Boolean(fieldErrors.deadline)} aria-describedby="deadline-error"/>{fieldErrors.deadline && <small id="deadline-error" className="field-error">{fieldErrors.deadline}</small>}</label>
         </div>
+        <p className="form-hint">Ordering required: start in the future → end → assessment opens → request deadline. A 60-second clock-skew safety margin is applied.</p>
       </div>
       <div className="form-section"><span>04 · Frozen evidence catalogue</span>
         <div className="two">
