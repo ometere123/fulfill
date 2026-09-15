@@ -137,7 +137,10 @@ async function write(functionName: string, args: any[] = [], value = 0n) {
   if (["MAJORITY_DISAGREE", "NO_MAJORITY", "DISAGREE"].includes(consensus)) {
     throw new Error("Validator consensus was not reached. No successful state change is being reported.");
   }
-  if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
+  const executionResult = receipt.txExecutionResultName
+    ?? receipt.executionResultName
+    ?? receipt.execution_result;
+  if (executionResult !== ExecutionResult.FINISHED_WITH_RETURN) {
     throw new Error("The transaction did not finish successfully.");
   }
   return receipt;
