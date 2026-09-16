@@ -66,3 +66,13 @@ Two smoke commitments were observed on the fixed deployment:
 - Commitment `1`: `LOCKED`, `0.001 GEN`, recipient `0x81301DD9C3605a7DA743D87b803156d8445620B0`, three checks totaling `10,000 bps`.
 - Commitment `2`: `LOCKED`, `0.001 GEN`, recipient `0x81301DD9C3605a7DA743D87b803156d8445620B0`, three checks totaling `10,000 bps`.
 - Individual smoke transaction hashes were not exposed by the frontend or recovered from the available RPC log query; none is fabricated here.
+
+## Later live lifecycle observations
+
+- Commitment `6` was created through the production frontend with the funder and recipient wallets, using `0.0001 GEN`, two public HTTPS sources (`genlayer.com` and `docs.genlayer.com`), and three checks totaling `10,000 bps`. Its observed state was `LOCKED`.
+- The recipient request window for commitment `6` expired at `2026-09-16 09:04` before an assessment request was submitted. The production detail page reported `Request window expired`; no assessment evidence is claimed.
+- Commitment `7` was created through the production frontend with the same two wallets, `0.0001 GEN`, the same public HTTPS sources, and three checks totaling `10,000 bps`. Its observed state was `LOCKED`.
+- The recipient successfully requested assessment for commitment `7`; the observed post-request state was `ASSESSMENT_REQUESTED`.
+- The permissionless assessment for commitment `7` finalized and was read back from the production contract. Observed check results were `CHECK_1: SATISFIED`, `CHECK_2: UNRESOLVED`, and `CHECK_3: SATISFIED`, for `6,500 / 10,000 bps` (`65%`). Assessment attempts were `1 / 8` and the commitment remained `ASSESSMENT_REQUESTED`.
+- No contest, finalization, recovery, payout, refund, or bond result is claimed for commitments `6` or `7`.
+- The frontend did not expose the corresponding transaction hashes in the observed UI session, and no hashes are fabricated here.
