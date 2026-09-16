@@ -143,7 +143,7 @@ async function write(functionName: string, args: any[] = [], value = 0n) {
   const outcome = transactionExecutionOutcome(receipt);
   if (outcome === "ERROR") throw new Error(`Contract execution failed. Check the transaction in Explorer: ${EXPLORER_URL}/tx/${hash}`);
   if (outcome === "UNKNOWN") throw new Error(`Transaction finalized, but the execution result could not be interpreted. Do not resubmit yet. Check its state in Explorer: ${EXPLORER_URL}/tx/${hash}`);
-  return receipt;
+  return Object.assign(receipt, { submittedHash: hash });
 }
 
 async function loadCommitments(): Promise<Commitment[]> {
@@ -438,6 +438,7 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [lastTransactionHash, setLastTransactionHash] = useState("");
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
   const load = async () => {
@@ -459,7 +460,9 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
         const requestState = requestAssessmentState(fresh, wallet, Math.floor(Date.now() / 1000));
         if (requestState !== "AVAILABLE") throw new Error(requestHelp(fresh, wallet));
       }
-      await write(functionName, [id]); await load();
+      const receipt = await write(functionName, [id]);
+      setLastTransactionHash(String(receipt.submittedHash || ""));
+      await load();
     }
     catch (reason:any) { setError(reason.message); }
     finally { setBusy(""); }
@@ -472,7 +475,8 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
       setError("");
       const scope = JSON.stringify(selected);
       const bond = BigInt(await read("quote_contest_bond", [id, scope]));
-      await write("contest_checks", [id, scope], bond);
+      const receipt = await write("contest_checks", [id, scope], bond);
+      setLastTransactionHash(String(receipt.submittedHash || ""));
       setSelected([]);
       await load();
     } catch (reason:any) {
@@ -558,6 +562,7 @@ function Detail({ id, wallet }: {id:number; wallet:string}) {
         <Action enabled={canRecoverUnresolved(record)} label="Recover unresolved" help="Available after the attempt cap or assessment grace, including the retry interval." onClick={() => action("unresolved","recover_unresolved")}/>
         <Action enabled={canFinalizeStalledContest(record)} label="Close stalled contest" help="Available after the contest attempt cap or grace, including the retry interval." onClick={() => action("stalled","finalize_stalled_contest")}/>
         {busy && <div className="action-note">Transaction pending: {busy}</div>}
+        {lastTransactionHash && <div className="action-note">Transaction finalized: <a href={`${EXPLORER_URL}/tx/${lastTransactionHash}`} target="_blank" rel="noreferrer">View in Explorer</a></div>}
         {error && <div className="inline-error">{error}</div>}
       </aside>
     </div>
