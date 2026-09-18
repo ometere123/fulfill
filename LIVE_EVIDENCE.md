@@ -1,4 +1,32 @@
-# Live evidence
+# Live evidence`r`n`r`n## Retryable non-decision fix deployment
+
+The prior fixed deployment below was superseded after the review identified that `SOURCE_UNAVAILABLE` and `MODEL_OUTPUT_INVALID` were rejected before assessment/contest records and attempt counters were persisted.
+
+- Network: GenLayer Studionet
+- Chain ID: 61999
+- RPC: https://studio.genlayer.com/api
+- Source commit: `c3eeb617a310eb9364ba73024d3506fadd40e5e4`
+- Deployment transaction: `0x31ea74526e2453d3c902fb1f4eea434d8cbaeab29e9dfca8c0591200d79d51b1`
+- Contract address: `0x6a5c526642F2bd61548427aDC753B35E5b1EFDcA`
+- Deployment status: Accepted / SUCCESS / Finalized
+- Deployer: active CLI account `praest-deployer` (`0x0d5540e0aD4B92Aa0ad4e5F1b8cD645ee1E363E7`)
+
+Verified post-deployment reads through stable GenLayer CLI 0.39.1:
+
+- `policy_version`: `FULFILL_SCORECARD_V2`
+- `contest_bond_bps`: `500`
+- `contest_window`: `172800`
+- `assessment_grace`: `604800`
+- `min_retry_interval`: `3600`
+- `max_assessment_attempts`: `8`
+- `max_contest_attempts`: `8`
+- `max_sources`: `8`
+- `max_checks`: `8`
+- `max_page_size`: `25`
+- `get_commitment_counter()`: `0`
+- `get_contract_accounting()`: all totals `0`
+
+Production frontend was updated to this address and redeployed at `https://the-fulfill.vercel.app`. The production JavaScript bundle contains the new address and no longer contains the superseded `0x0c850e64E5B6699735c9628507f8f82cDDb108e3` address.
 
 This record contains only observed deployment and read evidence.
 
