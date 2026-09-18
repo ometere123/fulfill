@@ -234,3 +234,91 @@ def test_contest_results_must_match_selected_check_scope(direct_vm, direct_deplo
     assert contract._score_results(commitment, json.dumps(valid), selected) == [0, 1]
     with pytest.raises(AssertionError):
         contract._score_results(commitment, json.dumps(valid + [{"check_id": "CHECK_A", "result": "SATISFIED"}]), selected)
+
+@pytest.mark.direct
+@pytest.mark.parametrize("operational_result", ["SOURCE_UNAVAILABLE", "MODEL_OUTPUT_INVALID"])
+def test_operational_assessment_results_are_retryable_non_decisions(
+    direct_vm, direct_deploy, direct_alice, direct_bob, operational_result
+):
+    contract = deploy(direct_deploy)
+    create(direct_vm, contract, direct_alice, direct_bob)
+    results = [
+        {"check_id": "CHECK_A", "result": operational_result},
+        {"check_id": "CHECK_B", "result": "NOT_SATISFIED"},
+    ]
+    assert contract._score_results(contract.get_commitment(1), json.dumps(results)) == [0, 1]
+    assert contract._validate_results(contract.get_commitment(1), json.dumps(results), "") == results
+
+
+@pytest.mark.direct
+@pytest.mark.parametrize("operational_result", ["SOURCE_UNAVAILABLE", "MODEL_OUTPUT_INVALID"])
+def test_operational_contest_results_are_retryable_non_decisions(
+    direct_vm, direct_deploy, direct_alice, direct_bob, operational_result
+):
+    contract = deploy(direct_deploy)
+    create(direct_vm, contract, direct_alice, direct_bob)
+    commitment = contract.get_commitment(1)
+    selected = json.dumps(["CHECK_B"])
+    results = [{"check_id": "CHECK_B", "result": operational_result}]
+    assert contract._score_results(commitment, json.dumps(results), selected) == [0, 1]
+    assert contract._validate_results(commitment, json.dumps(results), selected) == results
+
+@pytest.mark.direct
+@pytest.mark.parametrize("operational_result", ["SOURCE_UNAVAILABLE", "MODEL_OUTPUT_INVALID"])
+def test_assess_commitment_persists_retryable_operational_non_decision(
+    direct_vm, direct_deploy, direct_alice, direct_bob, operational_result, monkeypatch
+):
+    contract = deploy(direct_deploy)
+    create(direct_vm, contract, direct_alice, direct_bob)
+    direct_vm.warp("2100-01-01T02:00:00")
+    direct_vm.sender = addr(contract, direct_bob)
+    contract.request_assessment(1)
+    monkeypatch.setattr(contract, "_assess", lambda _commitment, _scope: json.dumps([
+        {"check_id": "CHECK_A", "result": operational_result},
+        {"check_id": "CHECK_B", "result": operational_result},
+    ]))
+    direct_vm.sender = addr(contract, direct_alice)
+    contract.assess_commitment(1)
+    commitment = contract.get_commitment(1)
+    record = contract.get_assessment_record(1, 0, 1)
+    assert commitment.assessment_attempts == 1
+    assert commitment.last_assessment_status == "UNRESOLVED"
+    assert commitment.status == 1
+    assert record.unresolved_count == 2
+    assert commitment.escrow_remaining == 1000
+    assert contract.get_contract_accounting()["remaining"] == 1000
+
+
+@pytest.mark.direct
+@pytest.mark.parametrize("operational_result", ["SOURCE_UNAVAILABLE", "MODEL_OUTPUT_INVALID"])
+def test_resolve_contest_persists_retryable_operational_non_decision(
+    direct_vm, direct_deploy, direct_alice, direct_bob, operational_result, monkeypatch
+):
+    contract = deploy(direct_deploy)
+    create(direct_vm, contract, direct_alice, direct_bob)
+    commitment = contract.get_commitment(1)
+    commitment.status = 2
+    commitment.provisional_results = json.dumps([
+        {"check_id": "CHECK_A", "result": "SATISFIED"},
+        {"check_id": "CHECK_B", "result": "NOT_SATISFIED"},
+    ])
+    commitment.provisional_bps = 6000
+    commitment.provisional_amount = 600
+    commitment.contest_deadline = 4102534800
+    contract.commitments[1] = commitment
+    direct_vm.sender = addr(contract, direct_bob)
+    direct_vm.value = 20
+    contract.contest_checks(1, json.dumps(["CHECK_B"]))
+    monkeypatch.setattr(contract, "_assess", lambda _commitment, _scope: json.dumps([
+        {"check_id": "CHECK_B", "result": operational_result},
+    ]))
+    direct_vm.value = 0
+    contract.resolve_contest(1)
+    updated = contract.get_commitment(1)
+    record = contract.get_assessment_record(1, 1, 1)
+    assert updated.contest_attempts == 1
+    assert updated.last_contest_status == "UNRESOLVED"
+    assert updated.status == 3
+    assert record.unresolved_count == 1
+    assert updated.escrow_remaining == 1000
+    assert contract.get_contract_accounting()["remaining"] == 1000

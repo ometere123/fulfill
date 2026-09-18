@@ -293,7 +293,7 @@ class Fulfill(gl.Contract):
             check = self._check_by_id(commitment, item["check_id"])
             if item["result"] == SATISFIED:
                 satisfied_bps += check["weight_bps"]
-            elif item["result"] != NOT_SATISFIED:
+            elif item["result"] not in (NOT_SATISFIED,):
                 unresolved_count += 1
         return [satisfied_bps, unresolved_count]
 
@@ -307,7 +307,7 @@ class Fulfill(gl.Contract):
             assert isinstance(item, dict) and set(item.keys()) == {"check_id", "result"}, "invalid assessment result"
             check_id = item["check_id"]
             assert check_id in expected and check_id not in seen, "assessment check scope mismatch"
-            assert item["result"] in (SATISFIED, NOT_SATISFIED, UNRESOLVED), "invalid assessment result label"
+            assert item["result"] in (SATISFIED, NOT_SATISFIED, UNRESOLVED, SOURCE_UNAVAILABLE, MODEL_OUTPUT_INVALID), "invalid assessment result label"
             seen.append(check_id)
         assert set(seen) == set(expected), "assessment result scope mismatch"
         return results
@@ -537,7 +537,7 @@ class Fulfill(gl.Contract):
 
         results_json = self._assess(commitment, commitment.contest_scope)
         round_number = u8(commitment.contest_attempts + 1)
-        score = self._score_results(commitment, results_json)
+        score = self._score_results(commitment, results_json, commitment.contest_scope)
         self._record_assessment(commitment_id, True, round_number, commitment.contest_scope, results_json)
 
         commitment.contest_attempts = round_number
