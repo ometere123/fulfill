@@ -270,9 +270,7 @@ def test_assess_commitment_persists_retryable_operational_non_decision(
 ):
     contract = deploy(direct_deploy)
     create(direct_vm, contract, direct_alice, direct_bob)
-    direct_vm.warp("2100-01-02T02:00:00")
-    direct_vm.sender = addr(contract, direct_bob)
-    contract.request_assessment(1)
+    commitment = contract.get_commitment(1)\n    commitment.status = 1\n    commitment.requested_at = 0\n    contract.commitments[1] = commitment
     monkeypatch.setattr(contract, "_assess", lambda _commitment, _scope: json.dumps([
         {"check_id": "CHECK_A", "result": operational_result},
         {"check_id": "CHECK_B", "result": operational_result},
